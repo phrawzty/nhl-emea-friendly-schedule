@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python process_schedule.py:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

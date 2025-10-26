@@ -3,3 +3,6 @@ nhl-schedule.csv
 
 # Generated output
 europe-friendly-games.md
+
+# Claude Code configuration
+.claude/

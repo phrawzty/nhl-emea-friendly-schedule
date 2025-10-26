@@ -32,8 +32,11 @@ python process_schedule.py --weekend
 # Add Canadian flag for Canadian teams
 python process_schedule.py --canada
 
+# Display as calendar view instead of bulleted list
+python process_schedule.py --calendar
+
 # Combine options
-python process_schedule.py --highlight "Winnipeg Jets" --star "Montreal Canadiens" --weekend --canada
+python process_schedule.py --highlight "Winnipeg Jets" --star "Montreal Canadiens" --weekend --canada --calendar
 ```
 
 ## Output
@@ -43,6 +46,10 @@ The script generates:
 - Console output with the same content
 
 Games are filtered to show only those starting between 13:00-22:00 Paris time, making them suitable for European viewers.
+
+### Display Formats
+
+By default, games are displayed as a bulleted list. Use the `--calendar` flag to display games in a monthly calendar view using markdown tables.
 
 ### Formatting
 

@@ -3,6 +3,7 @@ import csv
 import argparse
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import calendar
 
 def parse_and_filter_schedule(highlighted_teams=None, starred_teams=None, mark_weekend=False, mark_canada=False):
     """Process NHL schedule and find Europe-friendly game times."""
@@ -85,7 +86,8 @@ def parse_and_filter_schedule(highlighted_teams=None, starred_teams=None, mark_w
                         'is_highlighted': is_highlighted,
                         'is_starred': is_starred,
                         'is_weekend': is_weekend,
-                        'is_canadian': is_canadian
+                        'is_canadian': is_canadian,
+                        'datetime': paris_time  # Store full datetime for calendar formatting
                     })
 
             except (ValueError, IndexError) as e:
@@ -93,6 +95,39 @@ def parse_and_filter_schedule(highlighted_teams=None, starred_teams=None, mark_w
                 continue
 
     return europe_friendly_games
+
+def format_game_text(game, include_date=True):
+    """Format a single game with all its decorations (stars, flags, italics, bold).
+
+    Args:
+        game: Game dictionary with all metadata
+        include_date: Whether to include the date in the output (default True)
+
+    Returns:
+        Formatted game text string
+    """
+    # Build the base game text
+    if include_date:
+        game_text = f"{game['date']} at {game['time']} - {game['away_team']} @ {game['home_team']}"
+    else:
+        game_text = f"{game['time']} - {game['away_team']} @ {game['home_team']}"
+
+    # Build prefix with star and/or Canadian flag
+    prefix = ""
+    if game['is_starred']:
+        prefix = "⭐ "
+    if game['is_canadian']:
+        prefix += "🇨🇦 "
+
+    # Apply italics for weekend games
+    if game['is_weekend']:
+        game_text = f"*{game_text}*"
+
+    # Apply bold for starred or highlighted games
+    if game['is_starred'] or game['is_highlighted']:
+        return f"**{prefix}{game_text}**"
+    else:
+        return f"{prefix}{game_text}"
 
 def format_as_markdown(games, highlighted_teams=None, starred_teams=None):
     """Format the games list as Markdown with highlighted and starred teams."""
@@ -124,26 +159,94 @@ def format_as_markdown(games, highlighted_teams=None, starred_teams=None):
     md += "---\n\n"
 
     for game in games:
-        game_text = f"{game['date']} at {game['time']} - {game['away_team']} @ {game['home_team']}"
+        formatted_game = format_game_text(game, include_date=True)
+        md += f"- {formatted_game}\n"
 
-        # Apply italics for weekend games
-        if game['is_weekend']:
-            game_text = f"*{game_text}*"
+    return md
 
-        # Build prefix with star and/or Canadian flag
-        prefix = ""
-        if game['is_starred']:
-            prefix = "⭐ "
-        if game['is_canadian']:
-            prefix += "🇨🇦 "
+def format_as_calendar(games, highlighted_teams=None, starred_teams=None):
+    """Format the games list as a monthly calendar view using markdown tables."""
 
-        # Apply starring and highlighting
-        if game['is_starred']:
-            md += f"- **{prefix}{game_text}**\n"
-        elif game['is_highlighted']:
-            md += f"- **{prefix}{game_text}**\n"
-        else:
-            md += f"- {prefix}{game_text}\n"
+    if highlighted_teams is None:
+        highlighted_teams = []
+    if starred_teams is None:
+        starred_teams = []
+
+    if not games:
+        return "# Europe-Friendly NHL Games (2025/2026)\n\nNo games found starting at or before 22:00 Paris time."
+
+    md = "# Europe-Friendly NHL Games (2025/2026)\n\n"
+    md += f"*Games starting at or before 22:00 Paris time (all times in 24-hour format)*\n\n"
+    md += f"**Total games found: {len(games)}**\n\n"
+
+    # Count highlighted games
+    highlighted_games = [g for g in games if g['is_highlighted']]
+    if highlighted_games and highlighted_teams:
+        team_list = ', '.join(highlighted_teams)
+        md += f"**{team_list} games (highlighted): {len(highlighted_games)}**\n\n"
+
+    # Count starred games
+    starred_games = [g for g in games if g['is_starred']]
+    if starred_games and starred_teams:
+        team_list = ', '.join(starred_teams)
+        md += f"**{team_list} games (starred): {len(starred_games)}**\n\n"
+
+    md += "---\n\n"
+
+    # Group games by year-month
+    from collections import defaultdict
+    games_by_month = defaultdict(list)
+
+    for game in games:
+        dt = game['datetime']
+        year_month = (dt.year, dt.month)
+        games_by_month[year_month].append(game)
+
+    # Sort months chronologically
+    sorted_months = sorted(games_by_month.keys())
+
+    # Create a calendar for each month
+    for year, month in sorted_months:
+        month_name = calendar.month_name[month]
+        md += f"## {month_name} {year}\n\n"
+
+        # Create calendar header (Mon-Sun)
+        md += "| Mon | Tue | Wed | Thu | Fri | Sat | Sun |\n"
+        md += "|-----|-----|-----|-----|-----|-----|-----|\n"
+
+        # Get the calendar for this month
+        cal = calendar.monthcalendar(year, month)
+
+        # Create a dict of games by day
+        games_by_day = defaultdict(list)
+        for game in games_by_month[(year, month)]:
+            day = game['datetime'].day
+            games_by_day[day].append(game)
+
+        # Build the calendar rows
+        for week in cal:
+            row_parts = []
+            for day in week:
+                if day == 0:
+                    # Empty cell for days not in this month
+                    row_parts.append("")
+                else:
+                    # Check if there are games on this day
+                    day_games = games_by_day.get(day, [])
+                    if day_games:
+                        # Format the cell with game info
+                        cell = f"**{day}**<br><br>"
+                        for game in day_games:
+                            formatted_game = format_game_text(game, include_date=False)
+                            cell += formatted_game + "<br>"
+                        row_parts.append(cell.rstrip("<br>"))
+                    else:
+                        # Just the day number
+                        row_parts.append(str(day))
+
+            md += "| " + " | ".join(row_parts) + " |\n"
+
+        md += "\n"
 
     return md
 
@@ -173,6 +276,11 @@ if __name__ == "__main__":
         action='store_true',
         help='Add Canadian flag emoji for games with Canadian teams'
     )
+    parser.add_argument(
+        '--calendar',
+        action='store_true',
+        help='Display games in a calendar view using markdown tables instead of a bulleted list'
+    )
 
     args = parser.parse_args()
 
@@ -181,7 +289,12 @@ if __name__ == "__main__":
     starred_teams = [team.strip() for team in args.star.split(',') if team.strip()]
 
     games = parse_and_filter_schedule(highlighted_teams, starred_teams, args.weekend, args.canada)
-    markdown_output = format_as_markdown(games, highlighted_teams, starred_teams)
+
+    # Choose formatting based on --calendar flag
+    if args.calendar:
+        markdown_output = format_as_calendar(games, highlighted_teams, starred_teams)
+    else:
+        markdown_output = format_as_markdown(games, highlighted_teams, starred_teams)
 
     # Write to file
     with open('europe-friendly-games.md', 'w', encoding='utf-8') as f:

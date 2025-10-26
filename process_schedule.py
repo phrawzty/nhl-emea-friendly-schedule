@@ -4,13 +4,17 @@ import argparse
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-def parse_and_filter_schedule(highlighted_teams=None, starred_teams=None, mark_weekend=False):
+def parse_and_filter_schedule(highlighted_teams=None, starred_teams=None, mark_weekend=False, mark_canada=False):
     """Process NHL schedule and find Europe-friendly game times."""
 
     if highlighted_teams is None:
         highlighted_teams = []
     if starred_teams is None:
         starred_teams = []
+
+    # Canadian NHL teams
+    canadian_teams = ['Winnipeg Jets', 'Toronto Maple Leafs', 'Montreal Canadiens',
+                      'Ottawa Senators', 'Calgary Flames', 'Edmonton Oilers', 'Vancouver Canucks']
 
     europe_friendly_games = []
 
@@ -66,6 +70,12 @@ def parse_and_filter_schedule(highlighted_teams=None, starred_teams=None, mark_w
                     # Check if game is on Friday (4) or Saturday (5) and weekend marking is enabled
                     is_weekend = mark_weekend and paris_time.weekday() in [4, 5]
 
+                    # Check if any Canadian team is playing and marking is enabled
+                    is_canadian = mark_canada and any(
+                        team in away_team or team in home_team
+                        for team in canadian_teams
+                    )
+
                     europe_friendly_games.append({
                         'date': paris_time.strftime('%Y-%m-%d'),
                         'time': paris_time.strftime('%H:%M'),
@@ -74,7 +84,8 @@ def parse_and_filter_schedule(highlighted_teams=None, starred_teams=None, mark_w
                         'home_team': home_team,
                         'is_highlighted': is_highlighted,
                         'is_starred': is_starred,
-                        'is_weekend': is_weekend
+                        'is_weekend': is_weekend,
+                        'is_canadian': is_canadian
                     })
 
             except (ValueError, IndexError) as e:
@@ -119,13 +130,20 @@ def format_as_markdown(games, highlighted_teams=None, starred_teams=None):
         if game['is_weekend']:
             game_text = f"*{game_text}*"
 
+        # Build prefix with star and/or Canadian flag
+        prefix = ""
+        if game['is_starred']:
+            prefix = "⭐ "
+        if game['is_canadian']:
+            prefix += "🇨🇦 "
+
         # Apply starring and highlighting
         if game['is_starred']:
-            md += f"- **⭐ {game_text}**\n"
+            md += f"- **{prefix}{game_text}**\n"
         elif game['is_highlighted']:
-            md += f"- **{game_text}**\n"
+            md += f"- **{prefix}{game_text}**\n"
         else:
-            md += f"- {game_text}\n"
+            md += f"- {prefix}{game_text}\n"
 
     return md
 
@@ -150,6 +168,11 @@ if __name__ == "__main__":
         action='store_true',
         help='Italicize games on Friday or Saturday (Paris time)'
     )
+    parser.add_argument(
+        '--canada',
+        action='store_true',
+        help='Add Canadian flag emoji for games with Canadian teams'
+    )
 
     args = parser.parse_args()
 
@@ -157,7 +180,7 @@ if __name__ == "__main__":
     highlighted_teams = [team.strip() for team in args.highlight.split(',') if team.strip()]
     starred_teams = [team.strip() for team in args.star.split(',') if team.strip()]
 
-    games = parse_and_filter_schedule(highlighted_teams, starred_teams, args.weekend)
+    games = parse_and_filter_schedule(highlighted_teams, starred_teams, args.weekend, args.canada)
     markdown_output = format_as_markdown(games, highlighted_teams, starred_teams)
 
     # Write to file

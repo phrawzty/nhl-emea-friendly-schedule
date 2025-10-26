@@ -29,8 +29,11 @@ python process_schedule.py --star "Montreal Canadiens"
 # Italicize weekend games (Friday/Saturday in Paris time)
 python process_schedule.py --weekend
 
+# Add Canadian flag for Canadian teams
+python process_schedule.py --canada
+
 # Combine options
-python process_schedule.py --highlight "Winnipeg Jets" --star "Montreal Canadiens" --weekend
+python process_schedule.py --highlight "Winnipeg Jets" --star "Montreal Canadiens" --weekend --canada
 ```
 
 ## Output
@@ -46,3 +49,4 @@ Games are filtered to show only those starting between 13:00-22:00 Paris time, m
 - **Bold text** - Games highlighted with `--highlight` or `--star`
 - **⭐ Star symbol** - Games highlighted with `--star`
 - *Italic text* - Games on Friday or Saturday (Paris time) when using `--weekend`
+- **🇨🇦 Canadian flag** - Games with Canadian teams when using `--canada`
